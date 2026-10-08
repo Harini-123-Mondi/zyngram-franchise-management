@@ -1,0 +1,16 @@
+.clasp.json
+.clasprc.json
+.DS_Store
+
+node_modules/
+
+.env
+.env.*
+!.env.example
+
+dist/
+*.db
+*.db-*
+*.bak
+
+uploads/

@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <?!= include("Styles"); ?>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar"><a href="#" class="brand"><div class="brand-mark">Z</div><div><strong>Zyngram</strong><small>FRANCHISE</small></div></a><nav id="mainNav" class="main-nav"><button class="nav-button" data-view="registration">Registration</button><button class="nav-button" data-view="dashboard">Dashboard</button><button class="nav-button" data-view="franchise">Franchise</button><button class="nav-button" data-view="users">Users</button><button class="nav-button" data-view="reports">Reports</button></nav><div class="user-section"><span id="userInfo" class="user-info hidden"></span><button id="logoutBtn" class="button button-secondary logout-btn hidden">Logout</button></div><span class="top-label"><i></i> NETWORK ONLINE</span></header>
+      <main>
+        <section id="loginView" class="view active">
+          <div class="page-heading"><div><span class="eyebrow">ADMINISTRATOR ACCESS</span><h1>Login to Franchise System</h1><p>Enter your credentials to access the franchise management dashboard.</p></div></div>
+          <div class="content-grid">
+            <section class="card form-card">
+              <div class="card-heading"><div><h2>Admin Login</h2><p>Enter your email and password to continue.</p></div><span class="step-badge">LOGIN</span></div>
+              <div id="loginError" class="message error-message" role="alert" hidden></div>
+              <form id="loginForm" novalidate>
+                <div class="field-grid">
+                  <label class="field span-two">Email address <em>*</em><input name="email" type="email" autocomplete="email" maxlength="150" placeholder="admin@zyngram.com" required></label>
+                  <label class="field span-two">Password <em>*</em><input name="password" type="password" autocomplete="current-password" maxlength="50" placeholder="Enter password" required></label>
+                </div>
+                <div class="form-actions"><button id="loginBtn" class="button button-primary" type="submit">Login <span>→</span></button></div>
+              </form>
+            </section>
+            <aside class="side-column">
+              <section class="card note-card"><span class="note-icon">i</span><div><strong>Default Accounts</strong><p><b>HQ Admin:</b> admin@zyngram.com / admin123<br><b>Hub Admin:</b> hubadmin@zyngram.com / hub123<br><b>Center Admin:</b> centeradmin@zyngram.com / center123</p></div></section>
+            </aside>
+          </div>
+        </section>
+        <section id="registerView" class="view">
+          <div class="page-heading"><div><span class="eyebrow">PHYSICAL FRANCHISE ONBOARDING</span><h1>Register a customer</h1><p>Enter customer and service-area details to find their registered franchise.</p></div><div class="hierarchy-label"><span>POINT</span><b>›</b><span>CENTER</span><b>›</b><span>HUB</span><b>›</b><span>COMMAND</span></div></div>
+          <div class="content-grid">
+            <section class="card form-card">
+              <div class="card-heading"><div><h2>Customer details</h2><p>Fields marked with an asterisk are required.</p></div><span class="step-badge">REGISTRATION</span></div>
+              <div id="errorMessage" class="message error-message" role="alert" hidden></div>
+              <form id="registrationForm" novalidate>
+                <div class="field-grid">
+                  <label class="field span-two">Full name <em>*</em><input name="name" autocomplete="name" maxlength="100" placeholder="e.g. Priya Kumar" required></label>
+                  <label class="field">Mobile number <em>*</em><input name="mobile" autocomplete="tel" inputmode="tel" maxlength="16" placeholder="+91 98765 43210" required><small>Use a unique mobile number.</small></label>
+                  <label class="field">Email address <em>*</em><input name="email" type="email" autocomplete="email" maxlength="150" placeholder="name@example.com" required></label>
+                  <label class="field">State <em>*</em><input name="state" maxlength="60" placeholder="Telangana" required></label>
+                  <label class="field">District <em>*</em><input name="district" maxlength="60" placeholder="Hyderabad" required></label>
+                  <label class="field">City / town <em>*</em><input name="city" maxlength="60" placeholder="Hyderabad" required></label>
+                  <label class="field">PIN code <em>*</em><input name="pin" inputmode="numeric" pattern="[0-9]{4,10}" maxlength="10" placeholder="500001" required><small>Enter 4–10 digits.</small></label>
+                  <label class="field span-two">Service category <em>*</em><select name="service" required><option value="">Choose a service</option><option>Delivery</option><option>Installation</option><option>Repair</option><option>General Service</option></select></label>
+                </div>
+                <div class="form-actions"><span class="privacy-hint"><i>✓</i> Data is saved to the connected franchise register.</span><button id="submitButton" class="button button-primary" type="submit">Register customer <span>→</span></button></div>
+              </form>
+            </section>
+            <aside class="side-column">
+              <section class="card mapping-card">
+                <div class="card-heading"><div><h2>Franchise match</h2><p>Resolved from the submitted service area.</p></div><span class="pin-icon">⌖</span></div>
+                <div id="mappingPreview" class="mapping-preview"><span class="status-dot neutral"></span><div><strong>Ready to check</strong><small>Complete the location fields to preview a mapping.</small></div></div>
+                <div class="mini-hierarchy"><div><span>POINT</span><strong id="previewPoint">—</strong></div><div><span>CENTER</span><strong id="previewCenter">—</strong></div><div><span>HUB</span><strong id="previewHub">—</strong></div><div><span>COMMAND</span><strong id="previewCommand">—</strong></div></div>
+                <p class="mapping-footnote">No franchise is assigned unless a matching active location exists.</p>
+              </section>
+              <section class="card note-card"><span class="note-icon">i</span><div><strong>How matching works</strong><p>We compare State, District, City and PIN with active entries in the Franchise sheet. Unmatched locations are saved as <b>NOT MAPPED</b>.</p></div></section>
+            </aside>
+          </div>
+        </section>
+        <section id="dashboardView" class="view">
+          <div class="page-heading"><div><span class="eyebrow">FRANCHISE NETWORK OVERVIEW</span><h1>Registration dashboard</h1><p>Live totals and recent registrations from the connected spreadsheet.</p></div><button id="refreshDashboard" class="button button-secondary">↻ Refresh</button></div>
+          <div id="dashboardError" class="message error-message" role="alert" hidden></div>
+          <div class="metric-grid">
+            <article class="metric-card"><span class="metric-icon navy">◎</span><small>TOTAL CUSTOMERS</small><strong id="totalUsers">—</strong><span>All registrations</span></article>
+            <article class="metric-card"><span class="metric-icon green">⌖</span><small>MAPPED USERS</small><strong id="mappedUsers">—</strong><span>Assigned a franchise</span></article>
+            <article class="metric-card"><span class="metric-icon amber">◷</span><small>NOT MAPPED</small><strong id="unmappedUsers">—</strong><span>Needs a franchise match</span></article>
+            <article class="metric-card"><span class="metric-icon blue">📅</span><small>TODAY'S REGISTRATIONS</small><strong id="todayRegistrations">—</strong><span>Registered today</span></article>
+            <article class="metric-card"><span class="metric-icon purple">⌂</span><small>FRANCHISE UNITS</small><strong id="franchiseUnits">—</strong><span>Active Point locations</span></article>
+          </div>
+          <div class="dashboard-grid">
+            <section class="card"><div class="card-heading"><div><h2>Users by Center</h2><p>Registrations grouped by mapped Center.</p></div></div><div id="centerChart" class="chart-list"><p class="empty-copy">Loading summary…</p></div></section>
+            <section class="card"><div class="card-heading"><div><h2>Users by Hub</h2><p>Registrations grouped by mapped Hub.</p></div></div><div id="hubChart" class="chart-list"><p class="empty-copy">Loading summary…</p></div></section>
+          </div>
+          <section class="card recent-card"><div class="card-heading"><div><h2>Recent registrations</h2><p>Names, phone numbers and emails are omitted from this summary.</p></div><span class="live-tag"><i></i> LIVE DATA</span></div><div class="table-wrap"><table><thead><tr><th>USER ID</th><th>FRANCHISE</th><th>REGISTRATION DATE</th><th>MAPPING STATUS</th></tr></thead><tbody id="recentRows"><tr><td colspan="4" class="empty-cell">Loading registrations…</td></tr></tbody></table></div></section>
+        </section>
+        <section id="franchiseView" class="view">
+          <div class="page-heading"><div><span class="eyebrow">FRANCHISE MANAGEMENT</span><h1>Manage Franchise Records</h1><p>Add, view, and search franchise locations.</p></div><button id="addFranchiseBtn" class="button button-primary">+ Add Franchise</button></div>
+          <div id="franchiseError" class="message error-message" role="alert" hidden></div>
+          <section class="card"><div class="card-heading"><div><h2>Search Franchises</h2><p>Filter by Point, Center, Hub, City or PIN.</p></div></div><div class="search-bar"><input id="franchiseSearch" type="text" placeholder="Search franchises..."><button id="searchFranchiseBtn" class="button button-secondary">Search</button></div></section>
+          <section class="card"><div class="card-heading"><div><h2>Franchise List</h2><p>All registered franchise locations.</p></div></div><div class="table-wrap"><table><thead><tr><th>POINT ID</th><th>POINT NAME</th><th>CENTER</th><th>HUB</th><th>COMMAND</th><th>LOCATION</th><th>STATUS</th></thead><tbody id="franchiseRows"><tr><td colspan="7" class="empty-cell">Loading franchises…</td></tr></tbody></table></div></section>
+        </section>
+        <section id="usersView" class="view">
+          <div class="page-heading"><div><span class="eyebrow">USER MANAGEMENT</span><h1>Search Users</h1><p>Find and view customer registrations with advanced filters.</p></div><button id="exportUsersBtn" class="button button-secondary">Export Users</button></div>
+          <div id="usersError" class="message error-message" role="alert" hidden></div>
+          <section class="card"><div class="card-heading"><div><h2>Advanced Search</h2><p>Filter by multiple criteria.</p></div></div>
+            <div class="filter-grid">
+              <label class="field">Search <input id="userSearch" type="text" placeholder="User ID, Name, Mobile, Email..."></label>
+              <label class="field">Status <select id="userFilterStatus"><option value="">All Status</option><option value="MAPPED">Mapped</option><option value="NOT MAPPED">Not Mapped</option></select></label>
+              <label class="field">State <input id="userFilterState" type="text" placeholder="State"></label>
+              <label class="field">City <input id="userFilterCity" type="text" placeholder="City"></label>
+              <label class="field">Point ID <input id="userFilterPoint" type="text" placeholder="Point ID"></label>
+              <label class="field">Center ID <input id="userFilterCenter" type="text" placeholder="Center ID"></label>
+              <label class="field">Hub ID <input id="userFilterHub" type="text" placeholder="Hub ID"></label>
+              <label class="field">Start Date <input id="userFilterStartDate" type="date"></label>
+              <label class="field">End Date <input id="userFilterEndDate" type="date"></label>
+            </div>
+            <div class="form-actions"><button id="searchUserBtn" class="button button-primary">Search Users</button><button id="resetFiltersBtn" class="button button-secondary">Reset Filters</button></div>
+          </section>
+          <section class="card"><div class="card-heading"><div><h2>User Results</h2><p>Matching customer records.</p></div></div><div class="table-wrap"><table><thead><tr><th>USER ID</th><th>NAME</th><th>MOBILE</th><th>EMAIL</th><th>CITY</th><th>POINT</th><th>CENTER</th><th>STATUS</th></thead><tbody id="userRows"><tr><td colspan="8" class="empty-cell">No users found.</td></tr></tbody></table></div></section>
+        </section>
+        <section id="userDetailView" class="view">
+          <div class="page-heading"><div><span class="eyebrow">USER DETAILS</span><h1>Customer Information</h1><p>Complete customer registration details.</p></div><button id="backToUsersBtn" class="button button-secondary">← Back to Users</button></div>
+          <div id="userDetailError" class="message error-message" role="alert" hidden></div>
+          <div class="detail-grid" id="userDetailContent"><p class="empty-copy">Loading user details…</p></div>
+        </section>
+        <section id="reportsView" class="view">
+          <div class="page-heading"><div><span class="eyebrow">REPORTS</span><h1>Franchise Performance & Date Reports</h1><p>View comprehensive performance metrics and date-based registrations.</p></div></div>
+          <div id="reportsError" class="message error-message" role="alert" hidden></div>
+          <section class="card"><div class="card-heading"><div><h2>Date Range Report</h2><p>Filter registrations by date range.</p></div></div>
+            <div class="filter-grid">
+              <label class="field">Date Range <select id="dateRangeType"><option value="today">Today</option><option value="yesterday">Yesterday</option><option value="last7days">Last 7 Days</option><option value="last30days">Last 30 Days</option><option value="custom">Custom Range</option></select></label>
+              <label class="field">Start Date <input id="customStartDate" type="date" disabled></label>
+              <label class="field">End Date <input id="customEndDate" type="date" disabled></label>
+            </div>
+            <div class="form-actions"><button id="generateDateReportBtn" class="button button-primary">Generate Report</button></div>
+          </section>
+          <section class="card" id="dateReportCard" hidden><div class="card-heading"><div><h2 id="dateReportTitle">Date Report</h2><p id="dateReportSubtitle"></p></div></div>
+            <div class="metric-grid">
+              <article class="metric-card"><span class="metric-icon navy">◎</span><small>TOTAL REGISTRATIONS</small><strong id="dateTotalRegistrations">—</strong></article>
+              <article class="metric-card"><span class="metric-icon green">⌖</span><small>MAPPED</small><strong id="dateMappedRegistrations">—</strong></article>
+              <article class="metric-card"><span class="metric-icon amber">◷</span><small>NOT MAPPED</small><strong id="dateUnmappedRegistrations">—</strong></article>
+              <article class="metric-card"><span class="metric-icon blue">📅</span><small>ACTIVE</small><strong id="dateActiveRegistrations">—</strong></article>
+            </div>
+          </section>
+          <section class="card"><div class="card-heading"><div><h2>Franchise Performance Report</h2><p>Overall franchise performance metrics.</p></div></div>
+            <div class="form-actions"><button id="generatePerformanceReportBtn" class="button button-primary">Generate Performance Report</button></div>
+          </section>
+          <section class="card" id="performanceReportCard" hidden><div class="card-heading"><div><h2>Performance Metrics</h2><p>Comprehensive franchise performance data.</p></div></div>
+            <div class="metric-grid">
+              <article class="metric-card"><span class="metric-icon navy">◎</span><small>TOTAL USERS</small><strong id="perfTotalUsers">—</strong></article>
+              <article class="metric-card"><span class="metric-icon green">⌖</span><small>MAPPED USERS</small><strong id="perfMappedUsers">—</strong></article>
+              <article class="metric-card"><span class="metric-icon amber">◷</span><small>NOT MAPPED</small><strong id="perfUnmappedUsers">—</strong></article>
+              <article class="metric-card"><span class="metric-icon blue">📅</span><small>ACTIVE USERS (30d)</small><strong id="perfActiveUsers">—</strong></article>
+              <article class="metric-card"><span class="metric-icon purple">⌂</span><small>FRANCHISE UNITS</small><strong id="perfFranchiseUnits">—</strong></article>
+              <article class="metric-card"><span class="metric-icon green">%</span><small>MAPPING RATE</small><strong id="perfMappingRate">—</strong></article>
+            </div>
+            <div class="dashboard-grid">
+              <section class="card"><div class="card-heading"><div><h2>Top Centers</h2><p>Highest performing centers.</p></div></div><div id="topCentersChart" class="chart-list"><p class="empty-copy">Loading...</p></div></section>
+              <section class="card"><div class="card-heading"><div><h2>Top Hubs</h2><p>Highest performing hubs.</p></div></div><div id="topHubsChart" class="chart-list"><p class="empty-copy">Loading...</p></div></section>
+            </div>
+          </section>
+        </section>
+      </main>
+      <footer><span>ZYNGRAM FRANCHISE SYSTEM</span><span>Google Apps Script <i>•</i> Google Sheets</span></footer>
+    </div>
+    <div id="successModal" class="modal-backdrop" hidden><section class="success-modal" role="dialog" aria-modal="true" aria-labelledby="successTitle"><button id="closeSuccess" class="modal-close" aria-label="Close">×</button><div class="success-mark">✓</div><span class="eyebrow">REGISTRATION COMPLETE</span><h2 id="successTitle">Customer registered</h2><p id="successCopy">The customer record is saved.</p><div class="success-user-id"><small>USER ID</small><strong id="successUserId"></strong></div><div id="successHierarchy" class="success-hierarchy"></div><button id="doneSuccess" class="button button-primary full-width">Done</button></section></div>
+    <script>
+      const $ = (selector) => document.querySelector(selector);
+      const form = $("#registrationForm");
+      let previewTimer;
+      let currentUser = null;
+      
+      function showMessage(element, text) { element.textContent = text; element.hidden = !text; }
+      function runServer(method, ...args) {
+        return new Promise((resolve, reject) => {
+          const runner = google.script.run.withSuccessHandler(resolve).withFailureHandler((error) => reject(new Error(error.message || "The server could not complete the request.")));
+          const protectedMethods = new Set([
+            "getAdmins", "getFranchises", "searchFranchises", "addFranchise",
+            "searchUsers", "getUserDetails", "getDashboardData", "logoutAdmin",
+            "getFranchisePerformanceReport", "getDateReport", "exportUsers"
+          ]);
+          if (protectedMethods.has(method)) {
+            if (!currentUser?.sessionToken) return reject(new Error("Your administrator session has expired. Please sign in again."));
+            args.push(currentUser.sessionToken);
+          }
+          runner[method](...args);
+        });
+      }
+      function escapeHtml(value) {
+        return String(value).replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
+      }
+      
+      // Login functionality
+      $("#loginForm").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        showMessage($("#loginError"), "");
+        const data = Object.fromEntries(new FormData($("#loginForm")).entries());
+        if (!data.email || !data.password) return showMessage($("#loginError"), "Email and password are required.");
+        
+        $("#loginBtn").disabled = true;
+        try {
+          const result = await runServer("loginAdmin", data.email, data.password);
+          currentUser = result;
+          updateAuthUI();
+          switchView("dashboard");
+          await loadDashboard();
+        } catch (error) { showMessage($("#loginError"), error.message); }
+        finally { $("#loginBtn").disabled = false; }
+      });
+      
+      function updateAuthUI() {
+        if (currentUser) {
+          $("#userInfo").textContent = `${currentUser.name} (${currentUser.role.replace(/_/g, " ")})`;
+          $("#userInfo").classList.remove("hidden");
+          $("#logoutBtn").classList.remove("hidden");
+          $("#mainNav").classList.remove("hidden");
+        } else {
+          $("#userInfo").classList.add("hidden");
+          $("#logoutBtn").classList.add("hidden");
+          $("#mainNav").classList.add("hidden");
+        }
+      }
+      
+      $("#logoutBtn").addEventListener("click", async () => {
+        try { await runServer("logoutAdmin"); }
+        catch (error) { showMessage($("#loginError"), error.message); }
+        currentUser = null;
+        updateAuthUI();
+        switchView("login");
+        $("#loginForm").reset();
+      });
+      
+      function switchView(viewName) {
+        document.querySelectorAll(".nav-button").forEach((item) => item.classList.toggle("active", item.dataset.view === viewName));
+        document.querySelectorAll(".view").forEach((view) => view.classList.toggle("active", view.id === `${viewName}View`));
+      }
+      
+      document.querySelectorAll(".nav-button").forEach((button) => button.addEventListener("click", () => {
+        if (!currentUser) return;
+        switchView(button.dataset.view);
+        if (button.dataset.view === "dashboard") loadDashboard();
+        if (button.dataset.view === "franchise") loadFranchises();
+        if (button.dataset.view === "users") loadUsers();
+      }));
+      
+      function showMapping(result) {
+        const preview = $("#mappingPreview");
+        const mapped = result.status === "MAPPED";
+        preview.className = `mapping-preview ${mapped ? "mapped" : "unmapped"}`;
+        preview.innerHTML = `<span class="status-dot ${mapped ? "success" : "warning"}"></span><div><strong>${mapped ? "FRANCHISE MAPPED" : escapeHtml(result.status || "NOT MAPPED")}</strong><small>${escapeHtml(result.message || "")}</small></div>`;
+        $("#previewPoint").textContent = result.hierarchy?.point?.name || "—";
+        $("#previewCenter").textContent = result.hierarchy?.center?.name || "—";
+        $("#previewHub").textContent = result.hierarchy?.hub?.name || "—";
+        $("#previewCommand").textContent = result.hierarchy?.command?.name || "—";
+      }
+      async function refreshPreview() {
+        const data = Object.fromEntries(new FormData(form).entries());
+        if (!data.state || !data.district || !data.city || !data.pin) return;
+        try { showMapping(await runServer("getFranchiseMapping", data)); }
+        catch (error) { showMessage($("#errorMessage"), error.message); }
+      }
+      form.addEventListener("input", () => { clearTimeout(previewTimer); previewTimer = setTimeout(refreshPreview, 350); });
+      form.addEventListener("change", () => { clearTimeout(previewTimer); previewTimer = setTimeout(refreshPreview, 100); });
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        showMessage($("#errorMessage"), "");
+        if (!form.reportValidity()) return;
+        const data = Object.fromEntries(new FormData(form).entries());
+        if (!/^\+?[0-9\s()-]{8,16}$/.test(data.mobile)) return showMessage($("#errorMessage"), "Enter a valid mobile number with 8–16 digits.");
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) return showMessage($("#errorMessage"), "Enter a valid email address.");
+        if (!/^\d{4,10}$/.test(data.pin)) return showMessage($("#errorMessage"), "PIN code must contain 4–10 digits.");
+        $("#loadingOverlay").hidden = false;
+        $("#submitButton").disabled = true;
+        try {
+          const result = await runServer("registerUser", data);
+          $("#successUserId").textContent = result.userId;
+          $("#successCopy").textContent = result.status === "MAPPED" ? "The customer has been assigned to the matched franchise hierarchy." : "The customer was saved as NOT MAPPED. Review the location and franchise coverage.";
+          $("#successHierarchy").innerHTML = result.hierarchy ? [["POINT", result.hierarchy.point], ["CENTER", result.hierarchy.center], ["HUB", result.hierarchy.hub], ["COMMAND", result.hierarchy.command]]
+            .map(([level, item]) => `<div><small>${level}</small><strong>${escapeHtml(item?.name || "—")}</strong></div>`).join("") : '<div class="unmapped-note">No active franchise matched this location.</div>';
+          $("#successModal").hidden = false;
+          form.reset();
+          showMapping({ status: "READY", message: "Complete the location fields to preview a mapping." });
+          await loadDashboard();
+        } catch (error) { showMessage($("#errorMessage"), error.message); }
+        finally { $("#loadingOverlay").hidden = true; $("#submitButton").disabled = false; }
+      });
+      function closeSuccess() { $("#successModal").hidden = true; }
+      $("#closeSuccess").addEventListener("click", closeSuccess);
+      $("#doneSuccess").addEventListener("click", closeSuccess);
+      $("#refreshDashboard").addEventListener("click", loadDashboard);
+      
+      function renderBars(element, rows) {
+        if (!rows.length) { element.innerHTML = '<p class="empty-copy">No mapped registrations yet.</p>'; return; }
+        const max = Math.max(...rows.map((row) => row.count), 1);
+        element.innerHTML = rows.map((row) => `<div class="chart-row"><div><span>${escapeHtml(row.name)}</span><strong>${row.count}</strong></div><div class="bar-track"><i style="width:${Math.max(3, row.count / max * 100)}%"></i></div></div>`).join("");
+      }
+      
+      async function loadDashboard() {
+        $("#dashboardError").hidden = true;
+        try {
+          const data = await runServer("getDashboardData", currentUser);
+          $("#totalUsers").textContent = data.totalUsers;
+          $("#mappedUsers").textContent = data.mappedUsers;
+          $("#unmappedUsers").textContent = data.unmappedUsers;
+          $("#todayRegistrations").textContent = data.todayRegistrations;
+          $("#franchiseUnits").textContent = data.franchiseUnits;
+          renderBars($("#centerChart"), data.usersByCenter);
+          renderBars($("#hubChart"), data.usersByHub);
+          $("#recentRows").innerHTML = data.recentRegistrations.length ? data.recentRegistrations.map((item) =>
+            `<tr><td><strong>${escapeHtml(item.userId)}</strong></td><td>${escapeHtml(item.point || "—")}<small>${escapeHtml(item.center || "Not mapped")}</small></td><td>${escapeHtml(item.registeredAt)}</td><td><span class="table-status ${item.status === "MAPPED" ? "good" : "wait"}">${escapeHtml(item.status)}</span></td></tr>`
+          ).join("") : '<tr><td colspan="4" class="empty-cell">No registrations yet.</td></tr>';
+        } catch (error) { showMessage($("#dashboardError"), error.message); }
+      }
+      
+      async function loadFranchises() {
+        $("#franchiseError").hidden = true;
+        try {
+          const franchises = await runServer("getFranchises");
+          $("#franchiseRows").innerHTML = franchises.length ? franchises.map((f) =>
+            `<tr><td><strong>${escapeHtml(f.pointId)}</strong></td><td>${escapeHtml(f.pointName)}</td><td>${escapeHtml(f.centerName)}</td><td>${escapeHtml(f.hubName)}</td><td>${escapeHtml(f.commandName)}</td><td>${escapeHtml(f.city)}, ${escapeHtml(f.state)}</td><td><span class="table-status ${f.status === "ACTIVE" ? "good" : "wait"}">${escapeHtml(f.status)}</span></td></tr>`
+          ).join("") : '<tr><td colspan="7" class="empty-cell">No franchises found.</td></tr>';
+        } catch (error) { showMessage($("#franchiseError"), error.message); }
+      }
+      
+      async function loadUsers() {
+        $("#usersError").hidden = true;
+        try {
+          const filters = { query: "", status: "", state: "", city: "", point: "", center: "", hub: "", startDate: "", endDate: "" };
+          const users = await runServer("searchUsers", filters, currentUser);
+          renderUserResults(users);
+        } catch (error) { showMessage($("#usersError"), error.message); }
+      }
+      
+      function renderUserResults(users) {
+        $("#userRows").innerHTML = users.length ? users.map((u) =>
+          `<tr data-user-id="${escapeHtml(u.userId)}" class="user-row"><td><strong>${escapeHtml(u.userId)}</strong></td><td>${escapeHtml(u.name)}</td><td>${escapeHtml(u.mobile)}</td><td>${escapeHtml(u.email)}</td><td>${escapeHtml(u.city)}</td><td>${escapeHtml(u.point || "—")}</td><td>${escapeHtml(u.center || "—")}</td><td><span class="table-status ${u.status === "MAPPED" ? "good" : "wait"}">${escapeHtml(u.status)}</span></td></tr>`
+        ).join("") : '<tr><td colspan="8" class="empty-cell">No users found.</td></tr>';
+        
+        document.querySelectorAll(".user-row").forEach((row) => {
+          row.addEventListener("click", async () => {
+            const userId = row.dataset.userId;
+            await loadUserDetails(userId);
+          });
+        });
+      }
+      
+      async function loadUserDetails(userId) {
+        $("#userDetailError").hidden = true;
+        try {
+          const user = await runServer("getUserDetails", userId);
+          $("#userDetailContent").innerHTML = `
+            <div class="detail-card"><small>USER ID</small><strong>${escapeHtml(user.userId)}</strong></div>
+            <div class="detail-card"><small>NAME</small><strong>${escapeHtml(user.name)}</strong></div>
+            <div class="detail-card"><small>MOBILE</small><strong>${escapeHtml(user.mobile)}</strong></div>
+            <div class="detail-card"><small>EMAIL</small><strong>${escapeHtml(user.email)}</strong></div>
+            <div class="detail-card"><small>STATE</small><strong>${escapeHtml(user.state)}</strong></div>
+            <div class="detail-card"><small>DISTRICT</small><strong>${escapeHtml(user.district)}</strong></div>
+            <div class="detail-card"><small>CITY</small><strong>${escapeHtml(user.city)}</strong></div>
+            <div class="detail-card"><small>PIN</small><strong>${escapeHtml(user.pin)}</strong></div>
+            <div class="detail-card"><small>SERVICE</small><strong>${escapeHtml(user.service)}</strong></div>
+            <div class="detail-card"><small>POINT</small><strong>${escapeHtml(user.point || "—")}</strong><span>ID: ${escapeHtml(user.pointId || "—")}</span></div>
+            <div class="detail-card"><small>CENTER</small><strong>${escapeHtml(user.center || "—")}</strong><span>ID: ${escapeHtml(user.centerId || "—")}</span></div>
+            <div class="detail-card"><small>HUB</small><strong>${escapeHtml(user.hub || "—")}</strong><span>ID: ${escapeHtml(user.hubId || "—")}</span></div>
+            <div class="detail-card"><small>COMMAND</small><strong>${escapeHtml(user.command || "—")}</strong><span>ID: ${escapeHtml(user.commandId || "—")}</span></div>
+            <div class="detail-card"><small>STATUS</small><strong><span class="table-status ${user.status === "MAPPED" ? "good" : "wait"}">${escapeHtml(user.status)}</span></strong></div>
+            <div class="detail-card"><small>REGISTRATION DATE</small><strong>${escapeHtml(user.registrationDate)}</strong></div>
+          `;
+          switchView("userDetail");
+        } catch (error) { showMessage($("#userDetailError"), error.message); }
+      }
+      
+      $("#searchFranchiseBtn").addEventListener("click", async () => {
+        const query = $("#franchiseSearch").value.trim();
+        try {
+          const franchises = await runServer("searchFranchises", query);
+          $("#franchiseRows").innerHTML = franchises.length ? franchises.map((f) =>
+            `<tr><td><strong>${escapeHtml(f.pointId)}</strong></td><td>${escapeHtml(f.pointName)}</td><td>${escapeHtml(f.centerName)}</td><td>${escapeHtml(f.hubName)}</td><td>${escapeHtml(f.commandName)}</td><td>${escapeHtml(f.city)}, ${escapeHtml(f.state)}</td><td><span class="table-status ${f.status === "ACTIVE" ? "good" : "wait"}">${escapeHtml(f.status)}</span></td></tr>`
+          ).join("") : '<tr><td colspan="7" class="empty-cell">No franchises found.</td></tr>';
+        } catch (error) { showMessage($("#franchiseError"), error.message); }
+      });
+      
+      $("#searchUserBtn").addEventListener("click", async () => {
+        const filters = {
+          query: $("#userSearch").value.trim(),
+          status: $("#userFilterStatus").value,
+          state: $("#userFilterState").value.trim(),
+          city: $("#userFilterCity").value.trim(),
+          point: $("#userFilterPoint").value.trim(),
+          center: $("#userFilterCenter").value.trim(),
+          hub: $("#userFilterHub").value.trim(),
+          startDate: $("#userFilterStartDate").value,
+          endDate: $("#userFilterEndDate").value,
+        };
+        try {
+          const users = await runServer("searchUsers", filters, currentUser);
+          renderUserResults(users);
+        } catch (error) { showMessage($("#usersError"), error.message); }
+      });
+      
+      $("#resetFiltersBtn").addEventListener("click", () => {
+        $("#userSearch").value = "";
+        $("#userFilterStatus").value = "";
+        $("#userFilterState").value = "";
+        $("#userFilterCity").value = "";
+        $("#userFilterPoint").value = "";
+        $("#userFilterCenter").value = "";
+        $("#userFilterHub").value = "";
+        $("#userFilterStartDate").value = "";
+        $("#userFilterEndDate").value = "";
+        loadUsers();
+      });
+      
+      $("#exportUsersBtn").addEventListener("click", async () => {
+        const filters = {
+          query: $("#userSearch").value.trim(),
+          status: $("#userFilterStatus").value,
+          state: $("#userFilterState").value.trim(),
+          city: $("#userFilterCity").value.trim(),
+          point: $("#userFilterPoint").value.trim(),
+          center: $("#userFilterCenter").value.trim(),
+          hub: $("#userFilterHub").value.trim(),
+          startDate: $("#userFilterStartDate").value,
+          endDate: $("#userFilterEndDate").value,
+        };
+        try {
+          const result = await runServer("exportUsers", filters, currentUser, currentUser.adminId);
+          alert(`Export successful! ${result.recordCount} users exported.\nSpreadsheet URL: ${result.spreadsheetUrl}`);
+          window.open(result.spreadsheetUrl, "_blank");
+        } catch (error) {
+          alert("Export failed: " + error.message);
+        }
+      });
+      
+      $("#dateRangeType").addEventListener("change", () => {
+        const rangeType = $("#dateRangeType").value;
+        const customStartDate = $("#customStartDate");
+        const customEndDate = $("#customEndDate");
+        if (rangeType === "custom") {
+          customStartDate.disabled = false;
+          customEndDate.disabled = false;
+        } else {
+          customStartDate.disabled = true;
+          customEndDate.disabled = true;
+          customStartDate.value = "";
+          customEndDate.value = "";
+        }
+      });
+      
+      $("#generateDateReportBtn").addEventListener("click", async () => {
+        const rangeType = $("#dateRangeType").value;
+        const customStartDate = $("#customStartDate").value;
+        const customEndDate = $("#customEndDate").value;
+        
+        if (rangeType === "custom" && (!customStartDate || !customEndDate)) {
+          alert("Please select start and end dates for custom range.");
+          return;
+        }
+        
+        try {
+          const report = await runServer("getDateReport", rangeType, customStartDate, customEndDate, currentUser);
+          $("#dateReportTitle").textContent = report.rangeLabel + " Report";
+          $("#dateReportSubtitle").textContent = `${report.startDate} to ${report.endDate}`;
+          $("#dateTotalRegistrations").textContent = report.totalRegistrations;
+          $("#dateMappedRegistrations").textContent = report.mappedRegistrations;
+          $("#dateUnmappedRegistrations").textContent = report.unmappedRegistrations;
+          $("#dateActiveRegistrations").textContent = report.activeRegistrations;
+          $("#dateReportCard").hidden = false;
+        } catch (error) {
+          alert("Error generating report: " + error.message);
+        }
+      });
+      
+      $("#generatePerformanceReportBtn").addEventListener("click", async () => {
+        try {
+          const report = await runServer("getFranchisePerformanceReport", currentUser);
+          $("#perfTotalUsers").textContent = report.totalUsers;
+          $("#perfMappedUsers").textContent = report.mappedUsers;
+          $("#perfUnmappedUsers").textContent = report.unmappedUsers;
+          $("#perfActiveUsers").textContent = report.activeUsers;
+          $("#perfFranchiseUnits").textContent = report.totalFranchiseUnits;
+          $("#perfMappingRate").textContent = report.mappingRate + "%";
+          renderBars($("#topCentersChart"), report.topCenters);
+          renderBars($("#topHubsChart"), report.topHubs);
+          $("#performanceReportCard").hidden = false;
+        } catch (error) {
+          alert("Error generating performance report: " + error.message);
+        }
+      });
+      
+      $("#backToUsersBtn").addEventListener("click", () => switchView("users"));
+      
+      // Initialize
+      $("#mainNav").classList.add("hidden");
+      updateAuthUI();
+    </script>
+  </body>
+</html>
