@@ -76,7 +76,7 @@ function Login({ onLogin }) {
           <p>All active accounts created by the administrator can log in using their own email and password.</p>
           <p>Forgot your password? Ask an HQ administrator to reset it in User Management.</p>
           {import.meta.env.DEV && (
-            <p className="demo-credentials">Local demo admin: admin@zyngram.com / admin123</p>
+            <p className="demo-credentials">Local demo admin account is available only for local development.</p>
           )}
         </div>
         <p className="registration-login-link">New customer? <Link to="/register">Create an account</Link></p>

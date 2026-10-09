@@ -94,6 +94,16 @@ function isValidProfilePhoto(value) {
   return Buffer.from(value.slice('data:image/jpeg;base64,'.length), 'base64').length <= 1.5 * 1024 * 1024;
 }
 
+function resolveEmployeeDocumentPath(storedPath) {
+  if (typeof storedPath !== 'string') return null;
+  const normalizedPath = storedPath.replace(/[\\/]+/g, path.sep);
+  const legacyPrefix = `uploads${path.sep}employee-documents${path.sep}`;
+  if (!normalizedPath.startsWith(legacyPrefix)) return null;
+  const fileName = normalizedPath.slice(legacyPrefix.length);
+  if (!fileName || path.basename(fileName) !== fileName) return null;
+  return path.join(employeeDocumentsDirectory, fileName);
+}
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || 'zyngram-secret-key-change-in-production';
@@ -147,6 +157,8 @@ async function sendEmail(to, subject, text) {
 const dbPath = process.env.DATABASE_PATH
   ? path.resolve(__dirname, process.env.DATABASE_PATH)
   : path.join(__dirname, 'zyngram.db');
+const uploadsDirectory = path.resolve(process.env.UPLOADS_DIR || path.join(__dirname, 'uploads'));
+const employeeDocumentsDirectory = path.join(uploadsDirectory, 'employee-documents');
 fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 const db = new sqlite3.Database(dbPath, (err) => {
   if (err) {
@@ -931,6 +943,192 @@ app.get('/api/me', authenticateToken, (req, res) => {
   });
 });
 
+app.get('/api/chat/messages', authenticateToken, checkRole(['HQ_ADMIN', 'FRANCHISE_OWNER']), (req, res) => {
+  db.all(
+    `SELECT m.id, m.message, m.created_at, u.id AS sender_id, u.name AS sender_name, u.role AS sender_role
+     FROM chat_messages m
+     JOIN users u ON u.id = m.sender_id
+     ORDER BY m.created_at DESC, m.rowid DESC
+     LIMIT 100`,
+    [],
+    (err, messages) => {
+      if (err) {
+        console.error('Zynpi messages lookup failed:', err.message);
+        return res.status(500).json({ error: 'Failed to load Zynpi messages' });
+      }
+      res.json(messages.reverse());
+    }
+  );
+});
+
+app.post('/api/chat/messages', authenticateToken, checkRole(['HQ_ADMIN', 'FRANCHISE_OWNER']), (req, res) => {
+  const message = typeof req.body?.message === 'string' ? req.body.message.trim() : '';
+  if (!message || message.length > 2000) {
+    return res.status(400).json({ error: 'Message must contain 1 to 2000 characters' });
+  }
+
+  const messageId = uuidv4();
+  db.run(
+    'INSERT INTO chat_messages (id, sender_id, message) VALUES (?, ?, ?)',
+    [messageId, req.user.id, message],
+    function (err) {
+      if (err) {
+        console.error('Zynpi message save failed:', err.message);
+        return res.status(500).json({ error: 'Failed to send message' });
+      }
+      logAudit(req.user.id, req.user.role, 'CHAT_MESSAGE_CREATE', 'ZYNPI', messageId, 'SUCCESS', null);
+      db.get(
+        `SELECT m.id, m.message, m.created_at, u.id AS sender_id, u.name AS sender_name, u.role AS sender_role
+         FROM chat_messages m
+         JOIN users u ON u.id = m.sender_id
+         WHERE m.id = ?`,
+        [messageId],
+        (lookupError, savedMessage) => {
+          if (lookupError || !savedMessage) {
+            console.error('Zynpi saved message lookup failed:', lookupError?.message || 'Message not found');
+            return res.status(500).json({ error: 'Message was saved but could not be loaded' });
+          }
+          res.status(201).json(savedMessage);
+        }
+      );
+    }
+  );
+});
+
+app.get('/api/chat/assistant/messages', authenticateToken, checkRole(['HQ_ADMIN', 'FRANCHISE_OWNER']), (req, res) => {
+  db.all(
+    `SELECT id, role, message, created_at
+     FROM assistant_messages
+     WHERE user_id = ?
+     ORDER BY created_at DESC, rowid DESC
+     LIMIT 60`,
+    [req.user.id],
+    (err, messages) => {
+      if (err) {
+        console.error('Zynpi assistant history lookup failed:', err.message);
+        return res.status(500).json({ error: 'Failed to load your assistant conversation' });
+      }
+      res.json(messages.reverse());
+    }
+  );
+});
+
+app.post('/api/chat/assistant/messages', authenticateToken, checkRole(['HQ_ADMIN', 'FRANCHISE_OWNER']), async (req, res) => {
+  const prompt = typeof req.body?.message === 'string' ? req.body.message.trim() : '';
+  if (!prompt || prompt.length > 2000) {
+    return res.status(400).json({ error: 'Message must contain 1 to 2000 characters' });
+  }
+  if (!process.env.OPENAI_API_KEY) {
+    return res.status(503).json({ error: 'AI assistant is not configured. Add OPENAI_API_KEY to the backend .env file and restart the backend.' });
+  }
+
+  db.all(
+    `SELECT role, message FROM assistant_messages
+     WHERE user_id = ?
+     ORDER BY created_at DESC, rowid DESC
+     LIMIT 12`,
+    [req.user.id],
+    async (historyError, recentRows) => {
+      if (historyError) {
+        console.error('Zynpi assistant context lookup failed:', historyError.message);
+        return res.status(500).json({ error: 'Could not prepare your assistant conversation' });
+      }
+
+      const context = recentRows.reverse().map((row) => ({
+        role: row.role,
+        content: row.message
+      }));
+      context.push({ role: 'user', content: prompt });
+
+      let assistantReply;
+      try {
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+            messages: [
+              {
+                role: 'system',
+                content: 'You are Zynpi, a concise assistant for the Zyngram franchise management app. Help with app navigation, franchise operations, customer registration and mapping, mobile recharge orders, commissions, employees, attendance, leave, targets, and reports. Do not claim you can perform actions or access private account data; guide the user to the appropriate dashboard feature instead.'
+              },
+              ...context
+            ],
+            max_tokens: 500
+          }),
+          signal: AbortSignal.timeout(45000)
+        });
+        const result = await response.json();
+        if (!response.ok) {
+          console.error('OpenAI assistant request failed with status:', response.status);
+          if (response.status === 401 || response.status === 403) {
+            return res.status(502).json({ error: 'OpenAI rejected the configured API key. Check OPENAI_API_KEY in the backend environment.' });
+          }
+          if (response.status === 429) {
+            return res.status(503).json({ error: 'OpenAI rate limit or quota reached. Check your OpenAI billing and try again.' });
+          }
+          return res.status(502).json({ error: 'The AI assistant provider could not answer right now. Try again shortly.' });
+        }
+        assistantReply = result.choices?.[0]?.message?.content?.trim();
+        if (!assistantReply) {
+          console.error('OpenAI assistant returned an empty response');
+          return res.status(502).json({ error: 'The AI assistant returned an empty answer. Please try again.' });
+        }
+      } catch (providerError) {
+        console.error('OpenAI assistant request failed:', providerError.name === 'TimeoutError' ? 'request timed out' : providerError.message);
+        return res.status(502).json({
+          error: providerError.name === 'TimeoutError'
+            ? 'The AI assistant took too long to respond. Try again.'
+            : 'Could not connect to the AI assistant provider. Check the backend network and try again.'
+        });
+      }
+
+      const userMessageId = uuidv4();
+      const assistantMessageId = uuidv4();
+      db.serialize(() => {
+        db.run('BEGIN IMMEDIATE', (beginError) => {
+          if (beginError) {
+            console.error('Zynpi assistant save transaction failed:', beginError.message);
+            return res.status(500).json({ error: 'Could not save the assistant conversation' });
+          }
+          db.run(
+            'INSERT INTO assistant_messages (id, user_id, role, message) VALUES (?, ?, ?, ?)',
+            [userMessageId, req.user.id, 'user', prompt],
+            (userInsertError) => {
+              if (userInsertError) return rollbackAssistantMessages(userInsertError);
+              db.run(
+                'INSERT INTO assistant_messages (id, user_id, role, message) VALUES (?, ?, ?, ?)',
+                [assistantMessageId, req.user.id, 'assistant', assistantReply],
+                (assistantInsertError) => {
+                  if (assistantInsertError) return rollbackAssistantMessages(assistantInsertError);
+                  db.run('COMMIT', (commitError) => {
+                    if (commitError) return rollbackAssistantMessages(commitError);
+                    logAudit(req.user.id, req.user.role, 'AI_ASSISTANT_MESSAGE', 'ZYNPI', assistantMessageId, 'SUCCESS', null);
+                    res.status(201).json({
+                      messages: [
+                        { id: userMessageId, role: 'user', message: prompt },
+                        { id: assistantMessageId, role: 'assistant', message: assistantReply }
+                      ]
+                    });
+                  });
+                }
+              );
+            }
+          );
+        });
+      });
+
+      function rollbackAssistantMessages(error) {
+        console.error('Zynpi assistant messages could not be saved:', error.message);
+        db.run('ROLLBACK', () => res.status(500).json({ error: 'Could not save the assistant response. Please try again.' }));
+      }
+    }
+  );
+});
+
 app.get('/api/customers/me/attribution', authenticateToken, checkRole(['CUSTOMER']), (req, res) => {
   db.get(
     `SELECT a.status, a.physical_result, a.digital_result, a.coordinates, a.location_id
@@ -1469,9 +1667,13 @@ app.post('/api/geo/demo-customer-coverage', authenticateToken, checkRole(['HQ_AD
 // User routes
 app.post('/api/users', authenticateToken, checkRole(['HQ_ADMIN']), (req, res) => {
   const { name, mobile, email, password, role } = req.body;
+  const allowedUserRoles = ['HQ_ADMIN', 'COMMAND_ADMIN', 'HUB_ADMIN', 'CENTER_ADMIN', 'FRANCHISE_OWNER'];
   
   if (!name || !mobile || !email || typeof password !== 'string' || !role) {
     return res.status(400).json({ error: 'All fields are required' });
+  }
+  if (!allowedUserRoles.includes(role)) {
+    return res.status(400).json({ error: 'Select a supported administrative or franchise-owner role' });
   }
   if (String(password).length < 8) {
     return res.status(400).json({ error: 'Password must be at least 8 characters long' });
@@ -1502,25 +1704,39 @@ app.post('/api/users', authenticateToken, checkRole(['HQ_ADMIN']), (req, res) =>
             console.error('User creation failed:', err.message);
             return res.status(500).json({ error: 'Failed to create user' });
           }
-          logAudit(req.user.id, req.user.role, 'USER_CREATE', userId, null, 'SUCCESS', { name, role });
+          const finishUserCreation = async () => {
+            logAudit(req.user.id, req.user.role, 'USER_CREATE', userId, null, 'SUCCESS', { name, role });
 
-          const emailBody = `Welcome to Zyngram Franchise System\n\n` +
-            `Dear ${name},\n\n` +
-            `Your account has been created successfully.\n\n` +
-            `User ID: ${userId}\n` +
-            `Role: ${role}\n` +
-            `Email: ${normalizedEmail}\n\n` +
-            `Please sign in with this email and the password provided by your administrator.\n\n` +
-            `Best regards,\nZyngram Team`;
+            const emailBody = `Welcome to Zyngram Franchise System\n\n` +
+              `Dear ${name},\n\n` +
+              `Your account has been created successfully.\n\n` +
+              `User ID: ${userId}\n` +
+              `Role: ${role}\n` +
+              `Email: ${normalizedEmail}\n\n` +
+              `Please sign in with this email and the password provided by your administrator.\n\n` +
+              `Best regards,\nZyngram Team`;
 
-          const emailResult = await sendEmail(normalizedEmail, 'Welcome to Zyngram', emailBody);
-          if (emailResult.success) {
-            logAudit(req.user.id, req.user.role, 'EMAIL_SENT', userId, null, 'SUCCESS', { to: normalizedEmail });
-          } else {
-            logAudit(req.user.id, req.user.role, 'EMAIL_SENT', userId, null, 'FAILED', { error: emailResult.error });
-          }
+            const emailResult = await sendEmail(normalizedEmail, 'Welcome to Zyngram', emailBody);
+            if (emailResult.success) {
+              logAudit(req.user.id, req.user.role, 'EMAIL_SENT', userId, null, 'SUCCESS', { to: normalizedEmail });
+            } else {
+              logAudit(req.user.id, req.user.role, 'EMAIL_SENT', userId, null, 'FAILED', { error: emailResult.error });
+            }
 
-          res.json({ id: userId, user_code: userId, message: `User created successfully. User ID: ${userId}` });
+            res.status(201).json({ id: userId, user_code: userId, message: `User created successfully. User ID: ${userId}` });
+          };
+
+          if (role !== 'FRANCHISE_OWNER') return finishUserCreation();
+          db.run('INSERT INTO franchise_owners (user_id) VALUES (?)', [userId], (profileError) => {
+            if (profileError) {
+              console.error('Franchise owner profile creation failed:', profileError.message);
+              return db.run('DELETE FROM users WHERE id = ?', [userId], (cleanupError) => {
+                if (cleanupError) console.error('Failed to remove incomplete franchise owner account:', cleanupError.message);
+                res.status(500).json({ error: 'Failed to create the franchise owner profile' });
+              });
+            }
+            finishUserCreation();
+          });
         }
       );
     });
@@ -4328,8 +4544,9 @@ app.post('/api/employees/:id/documents', authenticateToken, checkRole(['HQ_ADMIN
       'image/png': '.png',
       'image/webp': '.webp'
     };
-    const relativePath = path.join('uploads', 'employee-documents', `${id}${extensions[fileMatch[1]]}`);
-    const absolutePath = path.join(__dirname, relativePath);
+    const fileName = `${id}${extensions[fileMatch[1]]}`;
+    const relativePath = `uploads/employee-documents/${fileName}`;
+    const absolutePath = path.join(employeeDocumentsDirectory, fileName);
     const uploadDirectory = path.dirname(absolutePath);
 
     fs.promises.mkdir(uploadDirectory, { recursive: true })
@@ -4390,9 +4607,8 @@ app.get('/api/documents/:id/download', authenticateToken, checkRole(['HQ_ADMIN',
         return res.status(403).json({ error: 'Cannot download a document outside your franchise scope' });
       }
 
-      const documentRoot = path.resolve(__dirname, 'uploads', 'employee-documents');
-      const absolutePath = path.resolve(__dirname, document.file_path || '');
-      if (!absolutePath.startsWith(`${documentRoot}${path.sep}`)) {
+      const absolutePath = resolveEmployeeDocumentPath(document.file_path);
+      if (!absolutePath) {
         return res.status(404).json({ error: 'Document file not found' });
       }
       res.download(absolutePath, document.document_name || path.basename(absolutePath), (downloadError) => {
@@ -4449,9 +4665,8 @@ app.delete('/api/documents/:id', authenticateToken, checkRole(['HQ_ADMIN', 'FRAN
         return res.status(500).json({ error: 'Failed to delete document' });
       }
 
-      const documentRoot = path.resolve(__dirname, 'uploads', 'employee-documents');
-      const absolutePath = path.resolve(__dirname, document.file_path || '');
-      if (absolutePath.startsWith(`${documentRoot}${path.sep}`)) {
+      const absolutePath = resolveEmployeeDocumentPath(document.file_path);
+      if (absolutePath) {
         fs.promises.unlink(absolutePath).catch((fileError) => {
           if (fileError.code !== 'ENOENT') console.error('Failed to remove deleted document file:', fileError.message);
         });

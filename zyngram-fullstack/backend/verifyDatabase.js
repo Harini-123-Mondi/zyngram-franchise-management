@@ -7,7 +7,8 @@ const expectedTables = [
   'users', 'customers', 'franchise_owners', 'franchises', 'geo_boundaries',
   'user_locations', 'customer_attributions', 'services', 'orders', 'order_status_history', 'order_attribution', 'commission_rules',
   'commission_ledger', 'wallet_ledger', 'employees', 'departments', 'designations',
-  'attendance', 'leave_requests', 'targets', 'employee_documents', 'notifications', 'audit_logs'
+  'attendance', 'leave_requests', 'targets', 'employee_documents', 'notifications', 'audit_logs',
+  'chat_messages', 'assistant_messages'
 ];
 
 const relationshipTables = [...new Set([...expectedTables, 'employee_franchise_mapping'])];
@@ -21,7 +22,8 @@ const requiredIndexes = [
   'idx_targets_employee_status', 'idx_employee_documents_employee',
   'idx_audit_logs_timestamp', 'idx_notifications_user_read_created',
   'idx_customer_attributions_customer_created', 'idx_customer_attributions_location',
-  'idx_order_status_history_order_created', 'idx_commission_rules_effective_lookup'
+  'idx_order_status_history_order_created', 'idx_commission_rules_effective_lookup',
+  'idx_chat_messages_created', 'idx_assistant_messages_user_created'
 ];
 
 const requiredForeignKeys = [
@@ -65,6 +67,8 @@ const requiredForeignKeys = [
   ['targets', 'designation_id', 'designations'],
   ['employee_documents', 'employee_id', 'employees'],
   ['notifications', 'user_id', 'users'],
+  ['chat_messages', 'sender_id', 'users'],
+  ['assistant_messages', 'user_id', 'users'],
   ['employee_franchise_mapping', 'employee_id', 'employees'],
   ['employee_franchise_mapping', 'franchise_id', 'franchises']
 ];

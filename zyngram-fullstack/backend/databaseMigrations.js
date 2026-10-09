@@ -325,6 +325,33 @@ const migrations = [
       'ALTER TABLE orders ADD COLUMN idempotency_key TEXT',
       'CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_idempotency_key ON orders(idempotency_key) WHERE idempotency_key IS NOT NULL'
     ]
+  },
+  {
+    version: 11,
+    name: 'add-zynpi-internal-chat-board',
+    statements: [
+      `CREATE TABLE IF NOT EXISTS chat_messages (
+        id TEXT PRIMARY KEY,
+        sender_id TEXT NOT NULL REFERENCES users(id),
+        message TEXT NOT NULL CHECK (length(trim(message)) BETWEEN 1 AND 2000),
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+      'CREATE INDEX IF NOT EXISTS idx_chat_messages_created ON chat_messages(created_at, id)'
+    ]
+  },
+  {
+    version: 12,
+    name: 'add-zynpi-private-ai-assistant-history',
+    statements: [
+      `CREATE TABLE IF NOT EXISTS assistant_messages (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+        message TEXT NOT NULL CHECK (length(trim(message)) BETWEEN 1 AND 4000),
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+      'CREATE INDEX IF NOT EXISTS idx_assistant_messages_user_created ON assistant_messages(user_id, created_at, id)'
+    ]
   }
 ];
 

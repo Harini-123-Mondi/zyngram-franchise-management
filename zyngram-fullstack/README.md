@@ -65,6 +65,8 @@ NODE_ENV=development
 JWT_SECRET=replace-with-a-random-secret-at-least-32-characters-long
 CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
 BOOTSTRAP_ADMIN_PASSWORD=replace-with-a-strong-password
+OPENAI_API_KEY=your-private-openai-api-key
+OPENAI_MODEL=gpt-4o-mini
 ```
 
 The development server allows localhost frontend origins. Production startup refuses to listen unless a strong `JWT_SECRET`, explicit `CORS_ORIGINS`, and a strong `BOOTSTRAP_ADMIN_PASSWORD` are configured. The known local demo administrator is development-only; never reuse its password or a development secret in production.
@@ -90,11 +92,22 @@ npm run dev
 
 The frontend will run on `http://localhost:3000` with API proxy to `http://localhost:5000`.
 
+## Deploy to Netlify and Render
+
+The repository includes `netlify.toml` for the Vite frontend and `render.yaml` for a Render web service. Push the project to GitHub first, then deploy the two services in this order:
+
+1. In Netlify, choose **Add new site → Import an existing project** and connect this GitHub repository. Netlify reads `netlify.toml`: its base directory is `frontend`, it runs `npm run build`, publishes `dist`, and rewrites SPA routes to `index.html`. Finish the first deploy and copy the site URL, for example `https://your-site.netlify.app`.
+2. In Render, choose **New → Blueprint**, connect the same repository, and apply `render.yaml`. When prompted for `CORS_ORIGINS`, enter the exact Netlify origin (scheme and hostname only, no trailing slash). Render generates `JWT_SECRET` and `BOOTSTRAP_ADMIN_PASSWORD`; copy the generated bootstrap password from the Render service environment settings and keep it private.
+3. In Render, add `OPENAI_API_KEY` as a private backend environment variable (never put it in the frontend or commit it); optionally set `OPENAI_MODEL` (defaults to `gpt-4o-mini`). After Render deploys, verify `https://your-api.onrender.com/api/health` reports database `OK` and schema version 12. In Netlify, open **Site configuration → Environment variables** and set `VITE_API_BASE_URL` to the Render service origin, e.g. `https://your-api.onrender.com`, with no `/api` suffix. Trigger a new Netlify deploy because Vite embeds this value at build time.
+4. Test sign-in, customer registration, and authenticated API calls on the Netlify domain. If the browser reports a CORS error, make sure Render `CORS_ORIGINS` exactly matches the Netlify origin and redeploy/restart the backend.
+
+The included Render blueprint intentionally uses the free web-service plan for a no-cost demo. **Its local SQLite database, uploaded employee documents, and newly created records are not durable on that plan and may be lost on restart/redeploy or instance sleep. Do not use this deployment for real customer, employee, or financial data.** For durable operation, use a persistent storage plan/disk, set `DATABASE_PATH` to a SQLite file on the mounted disk, and set `UPLOADS_DIR` to a directory on that disk (for example `/var/data/uploads`). A managed PostgreSQL deployment is not supported by this application's current SQLite data layer.
+
 ## Database Schema
 
-The local SQLite database creates the existing application tables idempotently at backend startup. Versioned migrations add customer/franchise-owner profiles, the Mobile Recharge seed, query indexes, database-level service references, transactional repair of orphaned legacy relationships, the physical/digital franchise hierarchy with order attribution, customer registration attribution snapshots, recharge processing history and a unique partial index for recharge idempotency keys (schema version 10). Invalid optional references are set to `NULL` and their original values are retained in `migration_quarantine`; invalid franchise rows are preserved but deactivated and quarantined. SQLite foreign-key enforcement is enabled, and `GET /api/health` reports database/schema readiness. A `DATABASE_PATH` environment variable can point SQLite at a persistent mounted volume; relative paths resolve from `backend/`.
+The local SQLite database creates the existing application tables idempotently at backend startup. Versioned migrations add customer/franchise-owner profiles, the Mobile Recharge seed, query indexes, database-level service references, transactional repair of orphaned legacy relationships, the physical/digital franchise hierarchy with order attribution, customer registration attribution snapshots, recharge processing history, a unique partial index for recharge idempotency keys, persistent Zynpi team-chat messages, and private per-user AI-assistant history (schema version 12). Zynpi is available to HQ Admin and Franchise Owner accounts; employee login is not yet part of this application. The AI assistant requires `OPENAI_API_KEY` on the backend; its key must never be exposed in frontend configuration. Invalid optional references are set to `NULL` and their original values are retained in `migration_quarantine`; invalid franchise rows are preserved but deactivated and quarantined. SQLite foreign-key enforcement is enabled, and `GET /api/health` reports database/schema readiness. A `DATABASE_PATH` environment variable can point SQLite at a persistent mounted volume; relative paths resolve from `backend/`.
 
-Run `npm run db:verify` from `backend/` to verify the required 23 application tables, schema version, 18 critical indexes, required foreign-key relationships, hierarchy/service constraints, Mobile Recharge order-processing columns, order status history, order and customer physical/digital attribution columns, the no-franchise-assignment constraint for `UNMAPPED` customer locations, active `SVC001` Mobile Recharge seed, foreign-key integrity, SQLite integrity, and table row counts. The migration tests cover repeat application, profile backfill, seeds, quarantine/repair, service-reference enforcement, hierarchy validation, customer attribution constraints, recharge request validation, duplicate idempotency keys, foreign-key constraints, and rollback on failure.
+Run `npm run db:verify` from `backend/` to verify the required 25 application tables, schema version, 20 critical indexes, required foreign-key relationships, hierarchy/service constraints, Mobile Recharge order-processing columns, order status history, order and customer physical/digital attribution columns, the no-franchise-assignment constraint for `UNMAPPED` customer locations, active `SVC001` Mobile Recharge seed, foreign-key integrity, SQLite integrity, and table row counts. The migration tests cover repeat application, profile backfill, seeds, quarantine/repair, service-reference enforcement, hierarchy validation, customer attribution constraints, recharge request validation, duplicate idempotency keys, chat and private assistant message persistence/validation, foreign-key constraints, and rollback on failure.
 
 This is a local SQLite migration and verification path, **not a production database deployment or a PostgreSQL migration**. The original base-table bootstrap and user-code alteration still need conversion into fully versioned forward/rollback migrations. Before live deployment, choose and authorize a managed production database, rehearse migrations against a sanitized copy of its data, review quarantined records and financial-ledger rules, and verify backup/restore and rollback. No production host or database credentials are configured in this workspace. Keep SQLite and uploaded documents on persistent storage for local operation; ephemeral server filesystems are not durable production storage.
 
@@ -146,11 +159,9 @@ Supporting tables include work locations, employee/franchise mappings, performan
 
 New orders receive a readable ID in `ORD-YYYYMMDD-XXXXXXXXXXXX` format. The date uses India Standard Time, and the unique suffix is generated on the backend. The same ID is returned from `POST /api/orders`, shown in the order-created confirmation, and stored as the order's primary key.
 
-### Default Admin
+### Admin bootstrap
 
-- Email: `admin@zyngram.com`
-- Password: `admin123`
-- Role: `HQ_ADMIN`
+For production, set `BOOTSTRAP_ADMIN_PASSWORD` to a secure private value in the hosting provider's environment settings. Never publish it in this README or in the frontend.
 
 ## API Endpoints
 

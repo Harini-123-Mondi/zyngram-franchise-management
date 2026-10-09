@@ -35,7 +35,7 @@
 - Login page displayed
 - Enter credentials:
   - Email: `admin@zyngram.com`
-  - Password: `admin123`
+  - Password: use the locally configured HQ Admin password
 - Click Login
 
 **Expected Result:**
@@ -490,7 +490,7 @@ Response → React State Update → UI Refresh
 
 **Default Login:**
 - Email: admin@zyngram.com
-- Password: admin123
+- Password: use the locally configured HQ Admin password
 
 **Files Created:**
 - Backend: server.js, package.json, .env

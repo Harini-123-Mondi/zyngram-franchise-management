@@ -14,6 +14,7 @@ import TargetsDocuments from './TargetsDocuments';
 import EmployeeReports from './EmployeeReports';
 import FranchiseDashboard from './FranchiseDashboard';
 import ZyngramLogo from './ZyngramLogo';
+import ZynpiChat from './ZynpiChat';
 
 const APPS_SCRIPT_PORTAL_URL = 'https://script.google.com/macros/s/AKfycbxYx0wD-_z_uHhhLTsyYZy7u1ZfYhPosyvA3_4IMvrYThdWdCO9djYaKxf6xm2tIjR02Q/exec';
 
@@ -22,6 +23,7 @@ function Dashboard({ user, onLogout }) {
   const [dashboardError, setDashboardError] = useState('');
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
+  const [isZynpiOpen, setIsZynpiOpen] = useState(false);
 
   useEffect(() => {
     fetchDashboardData();
@@ -279,6 +281,39 @@ function Dashboard({ user, onLogout }) {
         {activeTab === 'geo' && <GeoMapping user={user} />}
 
       </main>
+      {['HQ_ADMIN', 'FRANCHISE_OWNER'].includes(user?.role) && (
+        <>
+          {!isZynpiOpen && (
+            <button
+              type="button"
+              className="zynpi-launcher"
+              aria-label="Open Zynpi team chat"
+              aria-expanded={false}
+              onClick={() => setIsZynpiOpen(true)}
+            >
+              <span className="zynpi-launcher-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" focusable="false">
+                  <path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5 8 8 0 0 1-3.2-.67L4 20l1.38-4.03A7.5 7.5 0 1 1 20 11.5Z" />
+                  <path d="M8.5 11.5h.01M12 11.5h.01M15.5 11.5h.01" />
+                </svg>
+              </span>
+              <span>Zynpi</span>
+            </button>
+          )}
+          {isZynpiOpen && (
+            <div
+              className="zynpi-panel-backdrop"
+              onMouseDown={(event) => {
+                if (event.target === event.currentTarget) setIsZynpiOpen(false);
+              }}
+            >
+              <div className="zynpi-panel" role="dialog" aria-modal="true" aria-label="Zynpi team chat">
+                <ZynpiChat user={user} onClose={() => setIsZynpiOpen(false)} />
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

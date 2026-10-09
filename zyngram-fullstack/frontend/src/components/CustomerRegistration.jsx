@@ -9,6 +9,7 @@ function CustomerRegistration({ onLogin }) {
   const [locationError, setLocationError] = useState('');
   const [locationConsent, setLocationConsent] = useState(false);
   const [error, setError] = useState('');
+  const [accountExists, setAccountExists] = useState(false);
   const [result, setResult] = useState(null);
   const [loadingLocation, setLoadingLocation] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -46,6 +47,7 @@ function CustomerRegistration({ onLogin }) {
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError('');
+    setAccountExists(false);
     setSubmitting(true);
     try {
       const response = await axios.post('/api/auth/register/customer', {
@@ -57,10 +59,15 @@ function CustomerRegistration({ onLogin }) {
       });
       setResult(response.data);
     } catch (registrationError) {
-      setError(registrationError.response?.data?.error ||
+      const message = registrationError.response?.data?.error ||
         (registrationError.request
           ? 'Cannot reach the registration service. Check that the backend is running, then try again.'
-          : 'Customer registration could not be submitted. Please try again.'));
+          : 'Customer registration could not be submitted. Please try again.');
+      setError(message);
+      if (registrationError.response?.status === 409) {
+        setAccountExists(true);
+        setFormData((current) => ({ ...current, password: '' }));
+      }
     } finally {
       setSubmitting(false);
     }
@@ -110,7 +117,12 @@ function CustomerRegistration({ onLogin }) {
         </div>
         <h2 id="registration-title">Create customer account</h2>
         <p className="login-description">Your location is matched against active franchise boundaries by the server. If none match, you will be registered as UNMAPPED.</p>
-        {error && <div className="error" role="alert">{error}</div>}
+        {error && (
+          <div className="error" role="alert">
+            {error}
+            {accountExists && <> <Link to="/login">Sign in to your existing account</Link>.</>}
+          </div>
+        )}
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label htmlFor="customer-name">Full name</label>

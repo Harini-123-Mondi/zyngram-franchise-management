@@ -185,7 +185,11 @@ function UserManagement({ user }) {
                 <option value="COMMAND_ADMIN">Command Admin</option>
                 <option value="HUB_ADMIN">Hub Admin</option>
                 <option value="CENTER_ADMIN">Center Admin</option>
+                <option value="FRANCHISE_OWNER">Franchise Owner</option>
               </select>
+              {formData.role === 'FRANCHISE_OWNER' && (
+                <small className="field-hint">Franchise Owners can log in to Zynpi. Assign this account to a franchise to enable its franchise-scoped data.</small>
+              )}
             </div>
             <div className="form-actions">
               <button type="submit">Create User</button>
@@ -208,6 +212,7 @@ function UserManagement({ user }) {
           <option value="COMMAND_ADMIN">Command Admin</option>
           <option value="HUB_ADMIN">Hub Admin</option>
           <option value="CENTER_ADMIN">Center Admin</option>
+          <option value="FRANCHISE_OWNER">Franchise Owner</option>
         </select>
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
           <option value="">All Status</option>
