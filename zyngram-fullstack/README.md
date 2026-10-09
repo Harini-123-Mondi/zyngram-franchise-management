@@ -163,6 +163,8 @@ New orders receive a readable ID in `ORD-YYYYMMDD-XXXXXXXXXXXX` format. The date
 
 For production, set `BOOTSTRAP_ADMIN_PASSWORD` to a secure private value in the hosting provider's environment settings. Never publish it in this README or in the frontend.
 
+The bootstrap password is only used when the administrator is first created. To reset an existing bootstrap administrator, set a new private `BOOTSTRAP_ADMIN_PASSWORD` and temporarily set `RESET_BOOTSTRAP_ADMIN_PASSWORD=true` in the backend hosting environment, then deploy. After the deploy succeeds, remove `RESET_BOOTSTRAP_ADMIN_PASSWORD` and deploy again; keep the new bootstrap password value private. This reset applies only to the bootstrap account `admin@zyngram.com`.
+
 ## API Endpoints
 
 ### Authentication

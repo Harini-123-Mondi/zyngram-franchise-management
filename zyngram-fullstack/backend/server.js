@@ -613,7 +613,21 @@ function initializeDatabase() {
         failInitialization('Failed to look up the bootstrap administrator:', lookupError);
         return;
       }
-      if (row) return migrateUserCodes();
+      if (row) {
+        if (process.env.RESET_BOOTSTRAP_ADMIN_PASSWORD !== 'true') return migrateUserCodes();
+        return db.run(
+          'UPDATE users SET password = ? WHERE id = ?',
+          [hashedPassword, adminId],
+          (resetError) => {
+            if (resetError) {
+              failInitialization('Failed to reset the bootstrap administrator password:', resetError);
+              return;
+            }
+            console.log('Bootstrap administrator password reset from environment');
+            migrateUserCodes();
+          }
+        );
+      }
 
       db.run(
         `INSERT INTO users (id, name, mobile, email, password, role, status) VALUES (?, ?, ?, ?, ?, ?, ?)`,
