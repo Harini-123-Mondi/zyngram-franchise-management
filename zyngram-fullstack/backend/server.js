@@ -492,15 +492,8 @@ function initializeDatabase() {
     )`
   ];
   
-  tables.forEach((tableSQL) => {
-    db.run(tableSQL, (err) => {
-      if (err) {
-        console.error('Error creating table:', err.message);
-      }
-    });
-  });
-
-  db.run(
+  const initializationStatements = [
+    ...tables,
     `CREATE TABLE IF NOT EXISTS day12_readiness (
       task_id TEXT PRIMARY KEY,
       status TEXT NOT NULL DEFAULT 'NOT_STARTED'
@@ -510,116 +503,132 @@ function initializeDatabase() {
       updated_by TEXT,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`,
-    (tableError) => {
-      if (tableError) {
-        console.error('Failed to create Day 12 readiness table:', tableError.message);
-        return;
-      }
-      DAY12_READINESS_TASKS.forEach((taskId) => {
-        db.run('INSERT OR IGNORE INTO day12_readiness (task_id) VALUES (?)', [taskId], (seedError) => {
-          if (seedError) console.error(`Failed to initialize Day 12 readiness task ${taskId}:`, seedError.message);
-        });
-      });
-    }
-  );
-
-  runMigrations(db, (migrationError, version) => {
-    if (migrationError) {
-      console.error('Database migration failed:', migrationError.message);
-      process.exitCode = 1;
-      return;
-    }
-    databaseReady = true;
-    console.log(`Database schema is ready at version ${version}`);
-  });
-
-  db.run(
     `CREATE TABLE IF NOT EXISTS day12_deliverables (
       deliverable_id TEXT PRIMARY KEY,
       verified INTEGER NOT NULL DEFAULT 0 CHECK (verified IN (0, 1)),
       evidence TEXT NOT NULL DEFAULT '',
       updated_by TEXT,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`,
-    (tableError) => {
-      if (tableError) {
-        console.error('Failed to create Day 12 deliverables table:', tableError.message);
-        return;
-      }
-      DAY12_DELIVERABLES.forEach((deliverableId) => {
-        db.run('INSERT OR IGNORE INTO day12_deliverables (deliverable_id) VALUES (?)', [deliverableId], (seedError) => {
-          if (seedError) console.error(`Failed to initialize Day 12 deliverable ${deliverableId}:`, seedError.message);
+    )`
+  ];
+  let tableIndex = 0;
+  const createNextTable = () => {
+    if (tableIndex >= initializationStatements.length) {
+      return runMigrations(db, (migrationError, version) => {
+        if (migrationError) {
+          console.error('Database migration failed:', migrationError.message);
+          process.exitCode = 1;
+          return;
+        }
+
+        DAY12_READINESS_TASKS.forEach((taskId) => {
+          db.run('INSERT OR IGNORE INTO day12_readiness (task_id) VALUES (?)', [taskId], (seedError) => {
+            if (seedError) console.error(`Failed to initialize Day 12 readiness task ${taskId}:`, seedError.message);
+          });
+        });
+        DAY12_DELIVERABLES.forEach((deliverableId) => {
+          db.run('INSERT OR IGNORE INTO day12_deliverables (deliverable_id) VALUES (?)', [deliverableId], (seedError) => {
+            if (seedError) console.error(`Failed to initialize Day 12 deliverable ${deliverableId}:`, seedError.message);
+          });
+        });
+
+        initializeAdministrator(() => {
+          databaseReady = true;
+          console.log(`Database schema is ready at version ${version}`);
         });
       });
     }
-  );
-  
-  // Insert default admin user
-  const adminId = 'ADM001';
-  const bootstrapPassword = process.env.BOOTSTRAP_ADMIN_PASSWORD ||
-    (process.env.NODE_ENV === 'production' ? null : 'admin123');
-  const hashedPassword = bootstrapPassword ? bcrypt.hashSync(bootstrapPassword, 10) : null;
 
-  const migrateUserCodes = () => {
-    db.all('PRAGMA table_info(users)', [], (schemaError, columns) => {
-      if (schemaError) {
-        console.error('Failed to inspect users schema:', schemaError.message);
+    db.run(initializationStatements[tableIndex], (tableError) => {
+      if (tableError) {
+        console.error(`Failed to create database table ${tableIndex + 1}:`, tableError.message);
+        process.exitCode = 1;
         return;
       }
-      const populateCodes = () => {
-        db.all('SELECT id, user_code FROM users ORDER BY created_at, id', [], (usersError, users) => {
-          if (usersError) {
-            console.error('Failed to load users for ID migration:', usersError.message);
-            return;
-          }
-          for (const { id, userCode } of createUserCodeAssignments(users)) {
-            db.run('UPDATE users SET user_code = ? WHERE id = ? AND user_code IS NULL', [userCode, id], (updateError) => {
-              if (updateError) console.error(`Failed to assign readable ID to user ${id}:`, updateError.message);
-            });
-          }
-        });
-      };
-
-      if (columns.some((column) => column.name === 'user_code')) {
-        return populateCodes();
-      }
-      db.run('ALTER TABLE users ADD COLUMN user_code TEXT', (migrationError) => {
-        if (migrationError) {
-          console.error('Failed to add readable user ID column:', migrationError.message);
-          return;
-        }
-        db.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_user_code ON users(user_code)', (indexError) => {
-          if (indexError) {
-            console.error('Failed to index readable user IDs:', indexError.message);
-            return;
-          }
-          populateCodes();
-        });
-      });
+      tableIndex += 1;
+      createNextTable();
     });
   };
-  
-  if (!hashedPassword) {
-    console.error('BOOTSTRAP_ADMIN_PASSWORD is required to initialize the production administrator');
-    process.exitCode = 1;
-    return;
-  }
+  createNextTable();
 
-  db.get('SELECT id FROM users WHERE id = ?', [adminId], (err, row) => {
-    if (!row) {
+  function initializeAdministrator(onReady) {
+    const adminId = 'ADM001';
+    const bootstrapPassword = process.env.BOOTSTRAP_ADMIN_PASSWORD ||
+      (process.env.NODE_ENV === 'production' ? null : 'admin123');
+    const hashedPassword = bootstrapPassword ? bcrypt.hashSync(bootstrapPassword, 10) : null;
+
+    if (!hashedPassword) {
+      console.error('BOOTSTRAP_ADMIN_PASSWORD is required to initialize the production administrator');
+      process.exitCode = 1;
+      return;
+    }
+
+    const failInitialization = (message, error) => {
+      console.error(message, error.message);
+      process.exitCode = 1;
+    };
+
+    const migrateUserCodes = () => {
+      db.all('PRAGMA table_info(users)', [], (schemaError, columns) => {
+        if (schemaError) {
+          failInitialization('Failed to inspect users schema:', schemaError);
+          return;
+        }
+        const populateCodes = () => {
+          db.all('SELECT id, user_code FROM users ORDER BY created_at, id', [], (usersError, users) => {
+            if (usersError) {
+              failInitialization('Failed to load users for ID migration:', usersError);
+              return;
+            }
+            for (const { id, userCode } of createUserCodeAssignments(users)) {
+              db.run('UPDATE users SET user_code = ? WHERE id = ? AND user_code IS NULL', [userCode, id], (updateError) => {
+                if (updateError) console.error(`Failed to assign readable ID to user ${id}:`, updateError.message);
+              });
+            }
+            onReady();
+          });
+        };
+
+        if (columns.some((column) => column.name === 'user_code')) {
+          return populateCodes();
+        }
+        db.run('ALTER TABLE users ADD COLUMN user_code TEXT', (migrationError) => {
+          if (migrationError) {
+            failInitialization('Failed to add readable user ID column:', migrationError);
+            return;
+          }
+          db.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_user_code ON users(user_code)', (indexError) => {
+            if (indexError) {
+              failInitialization('Failed to index readable user IDs:', indexError);
+              return;
+            }
+            populateCodes();
+          });
+        });
+      });
+    };
+
+    db.get('SELECT id FROM users WHERE id = ?', [adminId], (lookupError, row) => {
+      if (lookupError) {
+        failInitialization('Failed to look up the bootstrap administrator:', lookupError);
+        return;
+      }
+      if (row) return migrateUserCodes();
+
       db.run(
         `INSERT INTO users (id, name, mobile, email, password, role, status) VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [adminId, 'HQ Administrator', '+919999999999', 'admin@zyngram.com', hashedPassword, 'HQ_ADMIN', 'ACTIVE'],
-        (err) => {
-          if (err) console.error('Error inserting admin:', err.message);
-          else console.log('Default admin user created');
+        (insertError) => {
+          if (insertError) {
+            failInitialization('Error inserting admin:', insertError);
+            return;
+          }
+          console.log('Default admin user created');
           migrateUserCodes();
         }
       );
-    } else {
-      migrateUserCodes();
-    }
-  });
+    });
+  }
 }
 
 // Audit logging function
